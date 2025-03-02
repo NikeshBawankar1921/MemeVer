@@ -1,10 +1,8 @@
 import axios from 'axios';
+import { MEME_API_BASE_URL } from '../config/constants';
 
-const BASE_URL = 'https://api.memegen.link';
-
-// Create axios instance with base configuration
 const api = axios.create({
-  baseURL: BASE_URL,
+  baseURL: MEME_API_BASE_URL,
   timeout: 10000,
 });
 
@@ -12,11 +10,7 @@ const api = axios.create({
 export const fetchTemplates = async () => {
   try {
     const response = await api.get('/templates');
-    return response.data.map(template => ({
-      ...template,
-      blank: `${BASE_URL}/images/${template.id}/_.jpg`,
-      name: template.name || template.id
-    }));
+    return response.data;
   } catch (error) {
     console.error('Error fetching templates:', error);
     throw error;
@@ -32,7 +26,7 @@ export const fetchMemes = async (page = 1, limit = 20) => {
     
     return templates.slice(start, end).map(template => ({
       id: template.id,
-      url: `${BASE_URL}/images/${template.id}/Sample_Text/Bottom_Text.jpg`,
+      url: `${MEME_API_BASE_URL}/images/${template.id}/Sample_Text/Bottom_Text.jpg`,
       name: template.name
     }));
   } catch (error) {
@@ -55,7 +49,7 @@ export const generateMeme = async (template, texts) => {
     });
 
     // Create the URL
-    const url = `${BASE_URL}/images/${template.id}/${processedTexts.join('/')}.jpg`;
+    const url = `${MEME_API_BASE_URL}/images/${template.id}/${processedTexts.join('/')}.jpg`;
 
     return { url };
   } catch (error) {

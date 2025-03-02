@@ -5,6 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { HiUpload, HiOutlineX } from 'react-icons/hi';
+import { IMGBB_API_KEY } from '../config/constants';
 
 const UploadPage = () => {
   const [file, setFile] = useState(null);
@@ -44,7 +45,7 @@ const UploadPage = () => {
       // Create FormData for ImgBB upload
       const formData = new FormData();
       formData.append('image', file);
-      formData.append('key', '703866954a55bad4f8f116a4dd0734fe');
+      formData.append('key', IMGBB_API_KEY);
 
       // Upload to ImgBB
       const response = await fetch('https://api.imgbb.com/1/upload', {

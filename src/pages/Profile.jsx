@@ -8,6 +8,7 @@ import { HiCamera, HiOutlinePencil, HiSave, HiLogout } from 'react-icons/hi';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import LikedMemes from './LikedMemes';
+import { IMGBB_API_KEY } from '../config/constants';
 
 const Profile = () => {
   const [file, setFile] = useState(null);
@@ -72,7 +73,7 @@ const Profile = () => {
     try {
       const formData = new FormData();
       formData.append('image', file);
-      formData.append('key', '703866954a55bad4f8f116a4dd0734fe');
+      formData.append('key', IMGBB_API_KEY);
 
       const response = await fetch('https://api.imgbb.com/1/upload', {
         method: 'POST',
@@ -139,43 +140,6 @@ const Profile = () => {
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
   return (
     <div className="min-h-screen p-8 bg-gray-100 dark:bg-gray-900">
       <div className="max-w-4xl mx-auto">
