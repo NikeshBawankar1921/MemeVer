@@ -36,9 +36,9 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gradient-to-r from-sky-400 to-sky-200 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900">
+      <div className="flex flex-col min-h-screen bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-blue-500/90 ">
         {/* Top Navigation */}
-        <nav className="fixed top-0 left-0 right-0 bg-gradient-to-r from-blue-400 to-blue-500 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900  border-b border-gray-200 dark:border-gray-700 z-50">
+        <nav className="fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-red-500/90 shadow-lg backdrop-blur-md dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 z-50">
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex justify-between items-center h-14">
               <Link to="/" className="text-xl font-bold text-white dark:text-blue-400">
@@ -56,8 +56,8 @@ function App() {
         </nav>
 
         {/* Main Content */}
-        <main className="pt-16 pb-20 px-4">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-grow pt-16 pb-20">
+          <div className="max-w-7xl mx-auto px-4">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/explore" element={<Explorer />} />
@@ -72,7 +72,7 @@ function App() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-blue-800 to-blue-900 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-pink-500/90 shadow-lg backdrop-blur-md dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
           <div className="max-w-7xl mx-auto">
             <div className="flex justify-around items-center h-16">
               <Link 

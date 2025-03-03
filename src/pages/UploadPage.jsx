@@ -82,7 +82,7 @@ const UploadPage = () => {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-100 rounded-lg dark:bg-gray-900">
+    <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/20 dark:border-gray-700/20 ">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8 dark:text-white">Upload Meme</h1>
 
@@ -129,7 +129,7 @@ const UploadPage = () => {
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Add a funny caption..."
-            className="w-full p-4 border-gray-900 bg-blue-300 text-white rounded-lg dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/20 dark:border-gray-700/20 w-full"
             rows={4}
           />
         </div>
@@ -138,7 +138,7 @@ const UploadPage = () => {
         <button
           onClick={handleUpload}
           disabled={isLoading}
-          className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+          className="px-8 py-3 bg-gradient-to-r from-violet-600 to-pink-600 text-white rounded-lg hover:bg-gradient-to-r hover:from-violet-600 hover:to-red-600 transition-colors disabled:opacity-50"
         >
           {isLoading ? 'Uploading...' : 'Upload Meme'}
         </button>

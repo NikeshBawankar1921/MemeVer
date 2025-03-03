@@ -3,6 +3,7 @@ import { HiHeart, HiOutlineHeart, HiChat, HiShare, HiUser } from 'react-icons/hi
 import { useSelector } from 'react-redux';
 import { fetchMemes, fetchTemplates } from '../services/api';
 import toast from 'react-hot-toast';
+import { handleShare } from '../utils/shareUtils';
 
 const Home = () => {
   const [memes, setMemes] = useState([]);
@@ -60,7 +61,7 @@ const Home = () => {
         
         return nextIndex;
       });
-    }, 6000);
+    }, 10000);
 
     // Cleanup interval on component unmount
     return () => {
@@ -85,19 +86,12 @@ const Home = () => {
     toast.success('Meme liked!');
   };
 
-  const handleShare = (meme) => {
-    // Copy meme URL to clipboard
-    navigator.clipboard.writeText(meme.url)
-      .then(() => toast.success('Meme URL copied to clipboard!'))
-      .catch(() => toast.error('Failed to copy URL'));
-  };
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className={`animate-spin rounded-full h-8 w-8 border-2 ${
-          darkMode ? 'border-blue-400' : 'border-blue-500'
-        } border-t-transparent`}></div>
+      <div className="min-h-screen relative flex justify-center items-center">
+        <div className="absolute inset-0 bg-gradient-to-br from-violet-600/30 via-fuchsia-500/30 to-pink-500/30 -z-10" />
+        <div className="absolute inset-0 backdrop-blur-xl -z-10" />
+        <div className="w-12 h-12 rounded-full border-4 border-violet-500/30 border-t-violet-500 animate-spin" />
       </div>
     );
   }
@@ -106,90 +100,93 @@ const Home = () => {
   const displayedMemes = memes.slice(currentMemeIndex, currentMemeIndex + 4);
 
   return (
-    <div className="container mx-auto px-4 py-8 relative overflow-hidden">
-      <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-        Trending Memes
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-        {displayedMemes.map((meme, index) => (
-          <div 
-            key={meme.id}
-            className={`
-              ${darkMode ? 'bg-gray-800' : 'bg-white'} 
-              rounded-lg shadow-md overflow-hidden 
-              transform transition-all duration-500 
-              ${animationDirection}
-              hover:scale-105
-            `}
-          >
-            <div className="relative aspect-video">
-              <img
-                src={meme.url}
-                alt={meme.title}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={(e) => {
-                  console.error('Image load error:', e);
-                  e.target.src = 'https://via.placeholder.com/600x400?text=Failed+to+load+meme';
-                }}
-              />
-            </div>
-            
-            <div className="p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <HiUser className={`text-xl ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} />
-                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-700'}`}>
-                  {meme.username}
-                </span>
-              </div>
+    <div className="min-h-screen relative">
+      {/* Background gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-violet-600/30 via-fuchsia-500/30 to-pink-500/30 -z-10" />
+      <div className="fixed inset-0 backdrop-blur-xl -z-10" />
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <button
-                    onClick={() => handleLike(meme.id)}
-                    className="text-2xl transition-colors duration-200"
-                  >
-                    {meme.liked ? (
-                      <HiHeart className="text-red-500" />
-                    ) : (
-                      <HiOutlineHeart className={`${
-                        darkMode ? 'text-gray-400 hover:text-red-400' : 'hover:text-red-500'
-                      }`} />
-                    )}
-                  </button>
-                  <button 
-                    className={`text-2xl transition-colors duration-200 ${
-                      darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    <HiChat />
-                  </button>
-                  <button 
-                    onClick={() => handleShare(meme)}
-                    className={`text-2xl transition-colors duration-200 ${
-                      darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-600 hover:text-gray-800'
-                    }`}
-                  >
-                    <HiShare />
-                  </button>
-                </div>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header Section with Glass Effect */}
+        <div className="bg-white/30 dark:bg-gray-800/30 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/20 dark:border-gray-700/20 shadow-xl">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-pink-600 bg-clip-text text-transparent">
+            Trending Memes
+          </h2>
+        </div>
+
+        {/* Memes Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          {displayedMemes.map((meme) => (
+            <div 
+              key={meme.id}
+              className="group relative rounded-2xl overflow-hidden bg-white/40 dark:bg-gray-800/40 
+                backdrop-blur-md shadow-lg border border-white/20 dark:border-gray-700/20
+                transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+            >
+              <div className="relative aspect-video">
+                <img
+                  src={meme.url}
+                  alt={meme.title}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/600x400?text=Failed+to+load+meme';
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               
-              <div className="mt-3">
-                <p className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {meme.title}
-                </p>
-                <div className={`text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  <span>{meme.likes.toLocaleString()} likes</span>
-                  <span className="mx-2">•</span>
-                  <span>{meme.comments.toLocaleString()} comments</span>
-                  <span className="mx-2">•</span>
-                  <span>{meme.shares.toLocaleString()} shares</span>
+              <div className="p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <HiUser className="text-xl text-gray-900 dark:text-white" />
+                  <span className="text-sm text-gray-900 dark:text-gray-200">
+                    {meme.username}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => handleLike(meme.id)}
+                      className="text-2xl transition-colors duration-200"
+                    >
+                      {meme.liked ? (
+                        <HiHeart className="text-red-500" />
+                      ) : (
+                        <HiOutlineHeart className="text-gray-700 dark:text-gray-300 hover:text-red-500" />
+                      )}
+                    </button>
+                    <button className="text-2xl text-gray-700 dark:text-gray-300 hover:text-violet-600">
+                      <HiChat />
+                    </button>
+                    <button 
+                      onClick={() => handleShare({
+                        name: meme.title,
+                        url: meme.url,
+                        type: 'meme'
+                      })}
+                      className="text-2xl text-gray-700 dark:text-gray-300 hover:text-pink-600"
+                    >
+                      <HiShare />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="mt-3">
+                  <p className="font-medium text-gray-900 dark:text-white">
+                    {meme.title}
+                  </p>
+                  <div className="text-sm mt-1 text-gray-700 dark:text-gray-300">
+                    <span>{meme.likes.toLocaleString()} likes</span>
+                    <span className="mx-2">•</span>
+                    <span>{meme.comments.toLocaleString()} comments</span>
+                    <span className="mx-2">•</span>
+                    <span>{meme.shares.toLocaleString()} shares</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );

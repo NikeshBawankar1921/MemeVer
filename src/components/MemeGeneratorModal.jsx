@@ -198,7 +198,7 @@ const MemeGeneratorModal = ({ template, onClose, onGenerate }) => {
               className={`flex items-center gap-2 px-6 py-2 rounded-md ${
                 darkMode
                   ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-blue-500 hover:bg-blue-600'
+                  : 'bg-gradient-to-r from-violet-600 to-pink-600 hover:from-pink-600 hover:to-violet-600 shadow-lg hover:shadow-xl'
               } text-white disabled:opacity-50`}
             >
               {loading ? 'Generating...' : 'Generate'}
