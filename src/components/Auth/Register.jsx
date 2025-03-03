@@ -13,19 +13,33 @@ const Register = () => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [contactError, setContactError] = useState('');
   const navigate = useNavigate();
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    // Validate phone number format
+    if (name === 'contact') {
+      const phoneRegex = /^\+\d{1,4}\d{10}$/; // Example: +911234567890
+      if (!phoneRegex.test(value)) {
+        setContactError('Enter a valid phone number with country code (e.g., +911234567890)');
+      } else {
+        setContactError('');
+      }
+    }
+
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    if (contactError) return;
 
+    setLoading(true);
     try {
       // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(
@@ -91,9 +105,11 @@ const Register = () => {
             name="contact"
             value={formData.contact}
             onChange={handleChange}
+            placeholder="+911234567890"
             className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             required
           />
+          {contactError && <p className="text-red-500 text-sm mt-1">{contactError}</p>}
         </div>
 
         <div>
@@ -110,7 +126,7 @@ const Register = () => {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || contactError}
           className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
         >
           {loading ? 'Creating Account...' : 'Register'}
