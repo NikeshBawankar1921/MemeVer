@@ -27,14 +27,18 @@ const Profile = () => {
     const fetchUserData = async () => {
       if (user) {
         try {
+          console.log('Fetching user data for:', user.uid);
           const userRef = doc(db, 'users', user.uid);
           const userSnap = await getDoc(userRef);
           
           if (userSnap.exists()) {
+            console.log('User data:', userSnap.data());
             const userData = userSnap.data();
             setDisplayName(userData.displayName || '');
             setBio(userData.bio || '');
             setProfilePicture(userData.photoURL || 'https://via.placeholder.com/150');
+          } else {
+            console.log('No user document found');
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -141,35 +145,51 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen p-8 bg-gray-100 dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold dark:text-white">User Profile</h1>
-          <button
-            onClick={handleLogout}
-            className="flex items-center px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-          >
-            <HiLogout className="mr-2" />
-            Logout
-          </button>
+    <div className="min-h-screen relative">
+      {/* Background gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-violet-600/30 via-fuchsia-500/30 to-pink-500/30 -z-10" />
+      <div className="fixed inset-0 backdrop-blur-xl -z-10" />
+
+      <div className="container mx-auto px-4 py-8">
+        {/* Header Card */}
+        <div className="bg-white/30 dark:bg-gray-800/30 backdrop-blur-md rounded-2xl p-6 mb-8 
+          border border-white/20 dark:border-gray-700/20 shadow-xl">
+          <div className="flex justify-between items-center">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-pink-600 bg-clip-text text-transparent">
+              User Profile
+            </h1>
+            <button
+              onClick={handleLogout}
+              className="flex items-center px-4 py-2 rounded-xl bg-red-500/80 hover:bg-red-500 
+                text-white backdrop-blur-sm transition-all duration-300 space-x-2"
+            >
+              <HiLogout />
+              <span>Logout</span>
+            </button>
+          </div>
         </div>
 
-        <div className={`rounded-lg p-8 ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow-lg`}>
+        {/* Profile Info Card */}
+        <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-8 
+          border border-white/20 dark:border-gray-700/20 shadow-xl transition-all duration-300">
           <div className="flex flex-col md:flex-row items-center space-y-8 md:space-y-0 md:space-x-8">
+            {/* Profile Picture Section */}
             <div className="relative w-48 h-48">
               <img
                 src={profilePicture}
                 alt="Profile"
-                onError={(e) => {
-                  e.target.src = 'https://via.placeholder.com/150';
-                }}
-                className="w-full h-full rounded-full object-cover border-4 border-white shadow-lg"
+                className="w-full h-full rounded-full object-cover border-4 
+                  border-white/50 dark:border-gray-700/50 shadow-lg"
+                onError={(e) => e.target.src = 'https://static.vecteezy.com/system/resources/previews/019/879/186/large_2x/user-icon-on-transparent-background-free-png.png'}
               />
               <label
                 htmlFor="fileInput"
-                className="absolute bottom-2 right-2 bg-blue-500 p-2 rounded-full cursor-pointer hover:bg-blue-600 transition-colors"
+                className="absolute bottom-2 right-2 p-3 rounded-full cursor-pointer
+                  bg-gradient-to-r from-violet-600 to-pink-600 text-white
+                  hover:from-pink-600 hover:to-violet-600 transition-all duration-300
+                  shadow-lg hover:shadow-xl"
               >
-                <HiCamera className="text-white" />
+                <HiCamera className="w-6 h-6" />
               </label>
               <input
                 id="fileInput"
@@ -179,38 +199,57 @@ const Profile = () => {
                 className="hidden"
               />
             </div>
-            <button
-              onClick={handleUpload}
-              disabled={isLoading}
-              className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Uploading...' : 'Update Profile'}
-            </button>
-            <div className="flex-1 space-y-4">
+
+            {/* Profile Details Section */}
+            <div className="flex-1 space-y-4 w-full">
               {isEditing ? (
                 <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="text-3xl font-bold bg-transparent border-b-2 border-blue-500 focus:outline-none dark:text-white w-full"
+                  className="w-full px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-900/50 
+                    border border-gray-200/20 dark:border-gray-700/20 
+                    focus:outline-none focus:ring-2 focus:ring-violet-500 
+                    text-gray-900 dark:text-white transition-all duration-300"
+                  placeholder="Your name"
                 />
               ) : (
-                <h2 className="text-3xl font-bold dark:text-white">{displayName || 'Anonymous User'}</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {displayName || 'Set Your User Name And Bio'}
+                </h2>
               )}
               
               {isEditing ? (
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
-                  className="w-full bg-transparent border-b-2 border-blue-500 focus:outline-none dark:text-white"
+                  className="w-full px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-900/50 
+                    border border-gray-200/20 dark:border-gray-700/20 
+                    focus:outline-none focus:ring-2 focus:ring-violet-500 
+                    text-gray-900 dark:text-white transition-all duration-300"
                   placeholder="Add a bio..."
+                  rows="3"
                 />
               ) : (
-                <p className="text-gray-600 dark:text-gray-300">{bio || 'No bio yet'}</p>
+                <p className="text-gray-600 dark:text-gray-400">{bio || 'No bio yet'}</p>
               )}
             </div>
           </div>
-          <div className="flex justify-end mt-4">
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-4 mt-6">
+            <button
+              onClick={handleUpload}
+              disabled={isLoading || !file}
+              className={`px-6 py-2 rounded-xl transition-all duration-300
+                ${isLoading || !file 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-violet-600 to-pink-600 hover:from-pink-600 hover:to-violet-600'
+                } text-white shadow-lg hover:shadow-xl`}
+            >
+              {isLoading ? 'Uploading...' : 'Update Picture'}
+            </button>
+            
             <button
               onClick={() => {
                 if (isEditing) {
@@ -218,25 +257,21 @@ const Profile = () => {
                 }
                 setIsEditing(!isEditing);
               }}
-              className="flex items-center px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              className="px-6 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 
+                text-white shadow-lg hover:shadow-xl transition-all duration-300
+                hover:from-pink-600 hover:to-violet-600 flex items-center space-x-2"
             >
-              {isEditing ? (
-                <>
-                  <HiSave className="mr-2" />
-                  Save Changes
-                </>
-              ) : (
-                <>
-                  <HiOutlinePencil className="mr-2" />
-                  Edit Profile
-                </>
-              )}
+              {isEditing ? <HiSave className="w-5 h-5" /> : <HiOutlinePencil className="w-5 h-5" />}
+              <span>{isEditing ? 'Save Changes' : 'Edit Profile'}</span>
             </button>
           </div>
         </div>
-      </div>
 
-      <LikedMemes/>
+        {/* Liked Memes Section */}
+        <div className="mt-8">
+          <LikedMemes />
+        </div>
+      </div>
     </div>
   );
 };

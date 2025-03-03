@@ -1,92 +1,122 @@
 import React, { useState, useEffect } from 'react';
-import { HiHeart, HiUpload } from 'react-icons/hi';
+import { HiDownload, HiShare } from 'react-icons/hi';
 import { toast } from 'react-hot-toast';
+import { handleShare } from '../utils/shareUtils';
+import { getLikedMemes } from '../utils/likeUtils';
+import { auth } from '../firebase/config';
+import { useNavigate } from 'react-router-dom';
 
 const LikedMemes = () => {
-  const [activeTab, setActiveTab] = useState('likes');
-  const [allMemes, setAllMemes] = useState([]);
   const [likedMemes, setLikedMemes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchAllMemes = async () => {
+    const fetchLikedMemes = async () => {
       try {
-        const response = await fetch('https://api.imgflip.com/get_memes');
-        if (!response.ok) throw new Error('Failed to fetch memes');
-        
-        const data = await response.json();
-        if (data.success) {
-          setAllMemes(data.data.memes);
-          // Get liked memes from localStorage after fetching all memes
-          const savedFavorites = localStorage.getItem('favoriteMemes');
-          if (savedFavorites) {
-            const favoriteIds = JSON.parse(savedFavorites);
-            const liked = data.data.memes.filter(meme => favoriteIds.includes(meme.id));
-            setLikedMemes(liked);
-          }
-        } else {
-          throw new Error('Failed to get memes from API');
-        }
+        setLoading(true);
+        console.log('Fetching liked memes...');
+        const memes = await getLikedMemes();
+        console.log('Fetched memes:', memes);
+        setLikedMemes(memes);
       } catch (error) {
-        console.error('Error fetching memes:', error);
-        toast.error('Failed to load memes');
+        console.error('Error fetching liked memes:', error);
+        toast.error('Failed to load liked memes');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAllMemes();
+    if (auth.currentUser) {
+      fetchLikedMemes();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const renderMemes = (memes) => {
-    if (loading) {
-      return <div className="text-center py-10 text-gray-500">Loading memes...</div>;
+  const handleDownload = async (meme) => {
+    try {
+      const response = await fetch(meme.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meme-${meme.name.replace(/\s+/g, '-')}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Meme downloaded successfully!');
+    } catch (error) {
+      toast.error('Failed to download meme');
     }
+  };
 
-    if (memes.length === 0) {
-      return <div className="text-center py-10 text-gray-500">No memes found</div>;
-    }
-
+  if (loading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {memes.map(meme => (
-          <div key={meme.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-            <div className="w-full h-48 overflow-hidden">
-              <img 
-                src={meme.url} 
-                alt={meme.name || 'Meme'} 
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
-                }}
-              />
-            </div>
-            <div className="p-2">
-              <h3 className="text-sm font-semibold truncate">{meme.name || 'Untitled Meme'}</h3>
+      <div className="flex justify-center py-8">
+        <div className="w-12 h-12 rounded-full border-4 border-violet-500/30 border-t-violet-500 animate-spin" />
+      </div>
+    );
+  }
+
+  if (likedMemes.length === 0) {
+    return (
+      <div className="text-center py-8 bg-white/30 dark:bg-gray-800/30 backdrop-blur-md rounded-xl">
+        <p className="text-gray-600 dark:text-gray-400">
+          No liked memes yet. Start exploring and like some memes!
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-pink-600 
+        bg-clip-text text-transparent mb-4">
+        Your Liked Memes
+      </h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {likedMemes.map((meme) => (
+          <div
+            key={meme.id}
+            className="group relative rounded-xl overflow-hidden bg-white/40 dark:bg-gray-800/40 
+              backdrop-blur-md shadow-lg border border-white/20 dark:border-gray-700/20
+              transition-all duration-300 hover:shadow-xl hover:scale-[1.02]"
+          >
+            <img
+              src={meme.url}
+              alt={meme.name}
+              className="w-full h-48 object-cover"
+              loading="lazy"
+            />
+            <div className="p-4">
+              <h3 className="font-medium mb-2 text-gray-900 dark:text-white truncate">
+                {meme.name}
+              </h3>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => handleDownload(meme)}
+                  className="text-xl text-violet-500 hover:text-violet-600 transition-colors"
+                >
+                  <HiDownload />
+                </button>
+                <button
+                  onClick={() => handleShare({
+                    name: meme.name,
+                    url: meme.url,
+                    type: 'meme'
+                  })}
+                  className="text-xl text-pink-500 hover:text-pink-600 transition-colors"
+                >
+                  <HiShare />
+                </button>
+              </div>
             </div>
           </div>
         ))}
       </div>
-    );
-  };
-
-  return (
-    <div className="min-h-screen p-8 bg-gray-100 dark:bg-gray-900">
-      <div className="flex space-x-4 mb-4 mt-8">
-        <button
-          onClick={() => setActiveTab('likes')}
-          className={`flex items-center px-4 py-2 rounded ${
-            activeTab === 'likes'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-          }`}
-        >
-          <HiHeart className="mr-2" />
-          Liked Memes ({likedMemes.length})
-        </button>
-      </div>
-
-      {activeTab === 'likes' && renderMemes(likedMemes)}
     </div>
   );
 };

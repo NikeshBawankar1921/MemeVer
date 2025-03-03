@@ -1,8 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { HiSearch, HiOutlineHeart, HiHeart, HiDownload, HiShare } from 'react-icons/hi';
 import toast from 'react-hot-toast';
 import { handleShare } from '../utils/shareUtils';
+import { toggleLikeMeme, getLikedMemes } from '../utils/likeUtils';
+import { auth, db } from '../firebase/config';
+import { doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 
 const ITEMS_PER_PAGE = 20; // Increased items per page
 
@@ -16,7 +19,7 @@ const FILTER_OPTIONS = [
 const Explorer = () => {
   const [allMemes, setAllMemes] = useState([]);
   const [displayedMemes, setDisplayedMemes] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState([]);
@@ -25,12 +28,31 @@ const Explorer = () => {
   const containerRef = useRef(null);
   const darkMode = useSelector((state) => state.theme.darkMode);
 
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem('favoriteMemes');
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites));
+  const loadMoreMemes = useCallback(() => {
+    if (!loading && hasMore) {
+      setPage(prev => prev + 1);
     }
-    fetchMemes();
+  }, [loading, hasMore]);
+
+  useEffect(() => {
+    const init = async () => {
+      const savedFavorites = localStorage.getItem('favoriteMemes');
+      if (savedFavorites) {
+        setFavorites(JSON.parse(savedFavorites));
+      }
+      await fetchMemes();
+    };
+    
+    init();
+  }, []); // Empty dependency array means this runs once on mount
+
+  useEffect(() => {
+    const loadLikedMemes = async () => {
+      const likedMemes = await getLikedMemes();
+      setFavorites(likedMemes.map(meme => meme.id));
+    };
+    
+    loadLikedMemes();
   }, []);
 
   useEffect(() => {
@@ -41,30 +63,22 @@ const Explorer = () => {
 
   useEffect(() => {
     const handleScroll = () => {
+      if (loading) return;
+
       const scrollTop = document.documentElement.scrollTop;
       const scrollHeight = document.documentElement.scrollHeight;
       const clientHeight = document.documentElement.clientHeight;
+      const scrollPosition = scrollTop + clientHeight;
+      const scrollTrigger = scrollHeight - 300; // Load more when 300px from bottom
 
-      // Debug logging
-      console.log('Scroll position:', {
-        scrollTop,
-        scrollHeight,
-        clientHeight,
-        hasMore,
-        loading,
-        threshold: scrollHeight - clientHeight - 100
-      });
-
-      // Check if we're near bottom (within 100px)
-      if (!loading && hasMore && scrollTop + clientHeight >= scrollHeight - 100) {
-        console.log('Loading more memes...');
-        setPage(prevPage => prevPage + 1);
+      if (scrollPosition >= scrollTrigger) {
+        loadMoreMemes();
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [loading, hasMore]);
+  }, [loading, loadMoreMemes]);
 
   useEffect(() => {
     if (page > 1) {
@@ -77,51 +91,52 @@ const Explorer = () => {
   const fetchMemes = async () => {
     try {
       setLoading(true);
-      // Fetch from multiple sources for more content
       const sources = [
         'https://api.imgflip.com/get_memes',
         'https://api.memegen.link/templates'
       ];
 
       const responses = await Promise.all(
-        sources.map(url => fetch(url).then(res => res.json()))
+        sources.map(url => 
+          fetch(url)
+            .then(res => res.json())
+            .catch(error => {
+              console.error(`Error fetching from ${url}:`, error);
+              return null;
+            })
+        )
       );
 
-      // Combine and format memes from different sources
       let combinedMemes = [];
 
-      // Process ImgFlip memes
-      if (responses[0].success) {
+      if (responses[0]?.success) {
         combinedMemes.push(...responses[0].data.memes.map(meme => ({
           id: `imgflip-${meme.id}`,
           url: meme.url,
           name: meme.name,
-          width: meme.width,
-          height: meme.height,
           isTrending: Math.random() > 0.7,
           isNew: Math.random() > 0.8,
           source: 'imgflip'
         })));
       }
 
-      // Process Memegen memes
       if (responses[1]) {
         combinedMemes.push(...responses[1].map(meme => ({
           id: `memegen-${meme.id}`,
           url: meme.blank,
           name: meme.name,
-          width: 500,
-          height: 500,
           isTrending: Math.random() > 0.7,
           isNew: Math.random() > 0.8,
           source: 'memegen'
         })));
       }
 
-      // Shuffle the combined memes
+      // Shuffle and set initial memes
       combinedMemes = combinedMemes.sort(() => Math.random() - 0.5);
       setAllMemes(combinedMemes);
+      setDisplayedMemes(combinedMemes.slice(0, ITEMS_PER_PAGE));
       setHasMore(combinedMemes.length > ITEMS_PER_PAGE);
+      
     } catch (error) {
       console.error('Error fetching memes:', error);
       toast.error('Failed to load memes');
@@ -179,6 +194,67 @@ const Explorer = () => {
       return newFavorites;
     });
   };
+
+  const handleLike = async (meme) => {
+    try {
+      if (!auth.currentUser) {
+        toast.error('Please login to like memes');
+        return;
+      }
+
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      const userDoc = await getDoc(userRef);
+
+      const memeData = {
+        id: meme.id,
+        url: meme.url,
+        name: meme.name,
+        timestamp: new Date().toISOString()
+      };
+
+      const likedMemes = userDoc.exists() ? (userDoc.data().likedMemes || []) : [];
+      const existingMeme = likedMemes.find(m => m.id === meme.id);
+
+      // Update Firestore
+      await updateDoc(userRef, {
+        likedMemes: existingMeme
+          ? arrayRemove(existingMeme) // Remove existing meme with exact data
+          : arrayUnion(memeData)      // Add new meme
+      });
+
+      // Update local state
+      setFavorites(prev => 
+        existingMeme
+          ? prev.filter(id => id !== meme.id)
+          : [...prev, meme.id]
+      );
+
+      toast.success(existingMeme ? 'Removed from likes' : 'Added to likes');
+
+    } catch (error) {
+      console.error('Error updating likes:', error);
+      toast.error('Failed to update likes');
+    }
+  };
+
+  useEffect(() => {
+    const fetchLikedMemes = async () => {
+      if (auth.currentUser) {
+        try {
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          const userDoc = await getDoc(userRef);
+          if (userDoc.exists()) {
+            const likedMemes = userDoc.data().likedMemes || [];
+            setFavorites(likedMemes.map(meme => meme.id));
+          }
+        } catch (error) {
+          console.error('Error fetching liked memes:', error);
+        }
+      }
+    };
+
+    fetchLikedMemes();
+  }, []);
 
   const handleDownload = async (meme) => {
     try {
@@ -271,7 +347,7 @@ const Explorer = () => {
                 </h3>
                 <div className="flex justify-between items-center">
                   <button
-                    onClick={() => toggleFavorite(meme)}
+                    onClick={() => handleLike(meme)}
                     className="text-2xl text-red-500 hover:text-red-600 transition-colors"
                   >
                     {favorites.includes(meme.id) ? <HiHeart /> : <HiOutlineHeart />}
@@ -304,19 +380,6 @@ const Explorer = () => {
         {loading && (
           <div className="flex justify-center my-8">
             <div className="w-12 h-12 rounded-full border-4 border-violet-500/30 border-t-violet-500 animate-spin" />
-          </div>
-        )}
-
-        {/* Load More Button - Optional fallback */}
-        {!loading && hasMore && (
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => setPage(prev => prev + 1)}
-              className="px-6 py-3 bg-gradient-to-r from-violet-600 to-pink-600 text-white rounded-xl 
-                hover:from-pink-600 hover:to-violet-600 transition-all duration-300"
-            >
-              Load More
-            </button>
           </div>
         )}
 
