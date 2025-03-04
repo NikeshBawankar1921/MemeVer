@@ -12,6 +12,7 @@ import Register from './components/Auth/Register'
 import { auth } from './firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
 import UploadPage from './pages/UploadPage'
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   const dispatch = useDispatch()
@@ -36,7 +37,25 @@ function App() {
 
   return (
     <Router>
-      <div className="flex flex-col min-h-screen bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-blue-500/90 ">
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        gutter={8}
+        containerStyle={{
+          top: 60, // Adjusted to appear below the top navigation bar
+        }}
+        toastOptions={{
+          className: '',
+          style: {
+            padding: '12px 24px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            maxWidth: '500px',
+            wordBreak: 'break-word'
+          }
+        }}
+      />
+      <div className="flex flex-col min-h-screen bg-blue-500  dark:bg-gray-900">
         {/* Top Navigation */}
         <nav className="fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-red-500/90 shadow-lg backdrop-blur-md dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 z-50">
           <div className="max-w-7xl mx-auto px-4">
@@ -64,9 +83,8 @@ function App() {
               <Route path="/uploadpage" element={<UploadPage />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/profile" element={user ? <Profile /> : <Navigate to="/auth/login" />} />
-              <Route path="/auth/login" element={!user ? <Login /> : <Navigate to="/profile" />} />
-              <Route path="/auth/register" element={!user ? <Register /> : <Navigate to="/profile" />} />
-              
+              <Route path="/auth/login" element={!user ? <Login /> : <Navigate to="/" />} />
+              <Route path="/auth/register" element={!user ? <Register /> : <Navigate to="/" />} />
             </Routes>
           </div>
         </main>
@@ -75,38 +93,23 @@ function App() {
         <nav className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-pink-500/90 shadow-lg backdrop-blur-md dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 border-t border-gray-200 dark:border-gray-700 z-50">
           <div className="max-w-7xl mx-auto">
             <div className="flex justify-around items-center h-16">
-              <Link 
-                to="/" 
-                className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-500"
-              >
+              <Link to="/" className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-500">
                 <HiHome className="h-6 w-6" />
                 <span className="text-xs mt-1">Home</span>
               </Link>
-              <Link 
-                to="/explore" 
-                className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400"
-              >
+              <Link to="/explore" className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400">
                 <HiSearch className="h-6 w-6" />
                 <span className="text-xs mt-1">Explore</span>
               </Link>
-              <Link 
-                to="/uploadpage" 
-                className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400"
-              >
+              <Link to="/uploadpage" className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400">
                 <HiUpload className="h-6 w-6" />
                 <span className="text-xs mt-1">Upload</span>
-              </Link> 
-              <Link 
-                to="/templates" 
-                className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400"
-              >
+              </Link>
+              <Link to="/templates" className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400">
                 <HiTemplate className="h-6 w-6" />
                 <span className="text-xs mt-1">Templates</span>
               </Link>
-              <Link 
-                to="/profile" 
-                className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400"
-              >
+              <Link to="/profile" className="flex flex-col items-center text-white hover:text-gray-900 dark:text-gray-400 dark:hover:text-blue-400">
                 <HiUser className="h-6 w-6" />
                 <span className="text-xs mt-1">Profile</span>
               </Link>

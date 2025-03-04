@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { HiSearch, HiDownload, HiShare } from 'react-icons/hi';
-import toast from 'react-hot-toast';
+import { HiSearch, HiDownload, HiShare, HiPencil } from 'react-icons/hi';
+import { showSuccessToast, showErrorToast } from '../utils/toast';
 import { handleShare } from '../utils/shareUtils';
+import { useNavigate } from 'react-router-dom';
 
 const Templates = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchTemplates();
@@ -20,9 +22,46 @@ const Templates = () => {
         setTemplates(data.data.memes);
       }
     } catch (error) {
-      toast.error('Failed to load templates');
+      showErrorToast('Failed to load templates');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditTemplate = async (template) => {
+    try {
+      // Fetch the template image
+      const response = await fetch(template.url);
+      const blob = await response.blob();
+      
+      // Create a File object from the blob
+      const file = new File([blob], `template-${template.name.replace(/\s+/g, '-')}.jpg`, {
+        type: 'image/jpeg'
+      });
+      
+      // Store the template data in sessionStorage to pass to the UploadPage
+      sessionStorage.setItem('templateToEdit', JSON.stringify({
+        file: URL.createObjectURL(file),
+        name: template.name,
+        originalUrl: template.url
+      }));
+      
+      // Navigate to the upload page
+      navigate('/uploadpage');
+      showSuccessToast('Template ready for editing!');
+    } catch (error) {
+      console.error('Error preparing template for edit:', error);
+      showErrorToast('Failed to prepare template for editing');
+    }
+  };
+
+  const handleTemplateAction = async (template) => {
+    try {
+      // Your template action logic here
+      showSuccessToast('Template action successful!');
+    } catch (error) {
+      console.error('Template action error:', error);
+      showErrorToast('Failed to perform template action');
     }
   };
 
@@ -81,6 +120,17 @@ const Templates = () => {
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  {/* Edit button overlay */}
+                  <button
+                    onClick={() => handleEditTemplate(template)}
+                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2
+                      bg-violet-500 hover:bg-violet-600 text-white p-3 rounded-full
+                      opacity-0 group-hover:opacity-100 transition-all duration-300
+                      shadow-lg"
+                  >
+                    <HiPencil className="w-6 h-6" />
+                  </button>
                 </div>
                 
                 <div className="p-4">
@@ -93,12 +143,20 @@ const Templates = () => {
                     </span>
                     <div className="flex space-x-3">
                       <button
+                        onClick={() => handleEditTemplate(template)}
+                        className="text-xl text-green-500 hover:text-green-600 transition-colors"
+                        title="Edit Template"
+                      >
+                        <HiPencil />
+                      </button>
+                      <button
                         onClick={() => handleShare({
                           name: template.name,
                           url: template.url,
                           type: 'template'
                         })}
                         className="text-xl text-pink-500 hover:text-pink-600 transition-colors"
+                        title="Share Template"
                       >
                         <HiShare />
                       </button>
@@ -115,12 +173,13 @@ const Templates = () => {
                             a.click();
                             window.URL.revokeObjectURL(url);
                             document.body.removeChild(a);
-                            toast.success('Template downloaded!');
+                            showSuccessToast('Template downloaded!');
                           } catch (error) {
-                            toast.error('Failed to download template');
+                            showErrorToast('Failed to download template');
                           }
                         }}
                         className="text-xl text-violet-500 hover:text-violet-600 transition-colors"
+                        title="Download Template"
                       >
                         <HiDownload />
                       </button>

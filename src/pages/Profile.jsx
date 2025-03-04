@@ -1,109 +1,172 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { storage, db, auth } from '../firebase/config';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { updateProfile } from 'firebase/auth';
+import { auth, db, storage } from '../firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { HiCamera, HiOutlinePencil, HiSave, HiLogout } from 'react-icons/hi';
-import { toast } from 'react-hot-toast';
+import { updateProfile } from 'firebase/auth';
+import { HiCamera, HiOutlinePencil, HiSave, HiLogout, HiPhotograph, HiPencil, HiOutlineHeart, HiHeart, HiUpload, HiTrash } from 'react-icons/hi';
 import { useNavigate } from 'react-router-dom';
-import LikedMemes from './LikedMemes';
+import { doc, getDoc, updateDoc, setDoc, arrayRemove, increment } from 'firebase/firestore';
+import { motion, AnimatePresence } from 'framer-motion';
 import { IMGBB_API_KEY } from '../config/constants';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { FaHeart, FaDownload } from 'react-icons/fa';
+import { saveAs } from 'file-saver';
+import { toast } from 'react-hot-toast';
 
 const Profile = () => {
-  const [file, setFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const fileInputRef = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [likedMemes, setLikedMemes] = useState([]);
+  const [uploadedMemes, setUploadedMemes] = useState([]);
+  const [activeTab, setActiveTab] = useState('uploaded'); // 'uploaded' or 'liked'
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
   const darkMode = useSelector((state) => state.theme.darkMode);
-  const user = auth.currentUser;
+  const [user] = useAuthState(auth);
 
   useEffect(() => {
     const fetchUserData = async () => {
       if (user) {
         try {
-          console.log('Fetching user data for:', user.uid);
-          const userRef = doc(db, 'users', user.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (userSnap.exists()) {
-            console.log('User data:', userSnap.data());
-            const userData = userSnap.data();
-            setDisplayName(userData.displayName || '');
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setDisplayName(userData.displayName || user.displayName || '');
             setBio(userData.bio || '');
-            setProfilePicture(userData.photoURL || 'https://via.placeholder.com/150');
+            
+            // Prioritize Firestore photoURL, fallback to Auth photoURL
+            const photoURL = userData.photoURL || user.photoURL || '';
+            setProfilePicture(photoURL);
+            
+            // If the photoURL in Firestore is different from Auth, update Auth
+            if (userData.photoURL && userData.photoURL !== user.photoURL) {
+              await updateProfile(user, {
+                photoURL: userData.photoURL
+              });
+            }
+            
+            // If the photoURL in Auth is different from Firestore, update Firestore
+            if (user.photoURL && (!userData.photoURL || userData.photoURL !== user.photoURL)) {
+              await updateDoc(doc(db, 'users', user.uid), {
+                photoURL: user.photoURL
+              });
+              setProfilePicture(user.photoURL);
+            }
+            
+            // Get liked memes from user document
+            const likedMemesData = userData.likedMemes || [];
+            setLikedMemes(likedMemesData);
+            
+            // Get uploaded memes from user document
+            const uploadedMemesData = userData.uploadedMemes || [];
+            setUploadedMemes(uploadedMemesData);
           } else {
-            console.log('No user document found');
+            // Initialize user document if it doesn't exist
+            await setDoc(doc(db, 'users', user.uid), {
+              displayName: user.displayName || '',
+              email: user.email,
+              photoURL: user.photoURL || '',
+              createdAt: new Date().toISOString(),
+              likedMemes: [],
+              uploadedMemes: [],
+              bio: ''
+            });
+            
+            setDisplayName(user.displayName || '');
+            setProfilePicture(user.photoURL || '');
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
+          toast.error('Failed to load profile data');
+        } finally {
+          setIsLoading(false);
         }
+      } else {
+        navigate('/auth/login');
       }
     };
 
     fetchUserData();
-  }, [user]);
+  }, [user, navigate]);
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      if (selectedFile.size > 5 * 1024 * 1024) {
-        toast.error('File size must be less than 5MB');
-        return;
-      }
-      setFile(selectedFile);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Update Firebase Auth profile
+      await updateProfile(user, {
+        displayName: displayName
+      });
+      
+      // Update Firestore document
+      await updateDoc(doc(db, 'users', user.uid), {
+        displayName,
+        bio
+      });
+      
+      toast.success('Profile updated successfully');
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleUpload = async () => {
-    if (!user) {
-      toast.error('You must be logged in to upload profile picture');
-      navigate('/auth/login');
+  const handleFileChange = async (e) => {
+    if (!user) return;
+    
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
       return;
     }
-
-    if (!file) {
-      toast.error('Please select a file to upload');
-      return;
-    }
-
-    setIsLoading(true);
+    
     try {
+      setIsLoading(true);
+      
+      // Create form data for ImgBB upload
       const formData = new FormData();
       formData.append('image', file);
       formData.append('key', IMGBB_API_KEY);
-
+      
+      // Upload to ImgBB
       const response = await fetch('https://api.imgbb.com/1/upload', {
         method: 'POST',
         body: formData
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const imageUrl = data.data.url;
+        
+        // Update Firebase Auth profile
+        await updateProfile(user, {
+          photoURL: imageUrl
+        });
+        
+        // Update Firestore document
+        await updateDoc(doc(db, 'users', user.uid), {
+          photoURL: imageUrl
+        });
+        
+        setProfilePicture(imageUrl);
+        toast.success('Profile picture updated successfully');
+      } else {
+        throw new Error('Failed to upload image to ImgBB');
       }
-
-      const imgbbData = await response.json();
-
-      if (!imgbbData.success) {
-        throw new Error('Profile picture upload failed: ' + JSON.stringify(imgbbData));
-      }
-
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        photoURL: imgbbData.data.url
-      });
-
-      setProfilePicture(imgbbData.data.url);
-      toast.success('Profile picture updated successfully!');
     } catch (error) {
-      console.error('Profile picture upload error:', error);
-      toast.error(`Failed to update profile picture: ${error.message}`);
+      console.error('Error uploading image:', error);
+      toast.error('Failed to upload profile picture');
     } finally {
       setIsLoading(false);
     }
@@ -112,165 +175,381 @@ const Profile = () => {
   const handleLogout = async () => {
     try {
       await auth.signOut();
-      localStorage.removeItem('userCredentials');
-      toast.success('Logged out successfully');
       navigate('/auth/login');
+      toast.success('Logged out successfully');
     } catch (error) {
-      toast.error('Failed to logout');
-      console.error('Logout error:', error);
+      console.error('Error logging out:', error);
+      toast.error('Failed to log out');
     }
   };
 
-  const updateProfileDetails = async () => {
-    if (!user) return;
+  const handleUnlike = async (meme) => {
+    if (!user) {
+      toast.error('Please login to manage liked memes');
+      return;
+    }
+
     try {
-      await updateProfile(user, {
-        displayName: displayName,
-        photoURL: profilePicture
-      });
-
       const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        toast.error('User document not found');
+        return;
+      }
+
+      const userData = userDoc.data();
+      const likedMemes = userData.likedMemes || [];
+
+      // Remove from liked memes
       await updateDoc(userRef, {
-        displayName: displayName,
-        bio: bio,
-        photoURL: profilePicture
+        likedMemes: likedMemes.filter((m) => m.id !== meme.id)
       });
 
-      setIsEditing(false);
-      toast.success('Profile updated successfully!');
+      // Update local state
+      setLikedMemes((prevMemes) => prevMemes.filter((m) => m.id !== meme.id));
+      toast.success('Removed from liked memes');
     } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      console.error('Error removing like:', error);
+      toast.error('Failed to remove from liked memes');
     }
   };
+
+  const handleDownload = async (meme) => {
+    try {
+      // Use meme.url if it exists, otherwise fall back to meme.imageUrl
+      const imageUrl = meme.url || meme.imageUrl;
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meme-${meme.id}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Meme downloaded successfully');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download meme');
+    }
+  };
+
+  if (isLoading && !user) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen relative">
-      {/* Background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-violet-600/30 via-fuchsia-500/30 to-pink-500/30 -z-10" />
-      <div className="fixed inset-0 backdrop-blur-xl -z-10" />
-
-      <div className="container mx-auto px-4 py-8">
-        {/* Header Card */}
-        <div className="bg-white/30 dark:bg-gray-800/30 backdrop-blur-md rounded-2xl p-6 mb-8 
-          border border-white/20 dark:border-gray-700/20 shadow-xl">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-pink-600 bg-clip-text text-transparent">
-              User Profile
-            </h1>
+    <div className="max-w-4xl mx-auto p-4">
+      {/* Profile Card */}
+      <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg rounded-2xl shadow-xl p-8 border border-white/20 dark:border-gray-700/20">
+        <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+          {/* Profile Picture */}
+          <div className="relative">
+            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 bg-gray-200 dark:bg-gray-700 shadow-lg">
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <HiPhotograph className="w-16 h-16 text-gray-400" />
+                </div>
+              )}
+            </div>
             <button
-              onClick={handleLogout}
-              className="flex items-center px-4 py-2 rounded-xl bg-red-500/80 hover:bg-red-500 
-                text-white backdrop-blur-sm transition-all duration-300 space-x-2"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute bottom-0 right-0 p-2 bg-indigo-500 text-white rounded-full shadow-lg hover:bg-indigo-600 transition-colors"
+              disabled={isLoading}
             >
-              <HiLogout />
-              <span>Logout</span>
+              {isLoading ? (
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+              ) : (
+                <HiCamera className="w-5 h-5" />
+              )}
             </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+
+          {/* Profile Info */}
+          <div className="flex-1">
+            {isEditing ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full p-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
+                    placeholder="Your name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Bio
+                  </label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    rows={3}
+                    className="w-full p-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
+                    placeholder="Write something about yourself..."
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveProfile}
+                    className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors flex items-center gap-2"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <HiSave className="w-5 h-5" />
+                    )}
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {displayName || 'Anonymous User'}
+                    </h1>
+                    <p className="text-gray-500 dark:text-gray-400">{user?.email}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="p-2 text-gray-500 hover:text-indigo-500 transition-colors"
+                    >
+                      <HiOutlinePencil className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      <HiLogout className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h3 className="font-medium text-gray-700 dark:text-gray-300">About</h3>
+                  <p className="mt-1 text-gray-600 dark:text-gray-400">
+                    {bio || 'No bio yet'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Profile Info Card */}
-        <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-md rounded-2xl p-8 
-          border border-white/20 dark:border-gray-700/20 shadow-xl transition-all duration-300">
-          <div className="flex flex-col md:flex-row items-center space-y-8 md:space-y-0 md:space-x-8">
-            {/* Profile Picture Section */}
-            <div className="relative w-48 h-48">
-              <img
-                src={profilePicture}
-                alt="Profile"
-                className="w-full h-full rounded-full object-cover border-4 
-                  border-white/50 dark:border-gray-700/50 shadow-lg"
-                onError={(e) => e.target.src = 'https://static.vecteezy.com/system/resources/previews/019/879/186/large_2x/user-icon-on-transparent-background-free-png.png'}
-              />
-              <label
-                htmlFor="fileInput"
-                className="absolute bottom-2 right-2 p-3 rounded-full cursor-pointer
-                  bg-gradient-to-r from-violet-600 to-pink-600 text-white
-                  hover:from-pink-600 hover:to-violet-600 transition-all duration-300
-                  shadow-lg hover:shadow-xl"
-              >
-                <HiCamera className="w-6 h-6" />
-              </label>
-              <input
-                id="fileInput"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
-
-            {/* Profile Details Section */}
-            <div className="flex-1 space-y-4 w-full">
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-900/50 
-                    border border-gray-200/20 dark:border-gray-700/20 
-                    focus:outline-none focus:ring-2 focus:ring-violet-500 
-                    text-gray-900 dark:text-white transition-all duration-300"
-                  placeholder="Your name"
-                />
-              ) : (
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {displayName || 'Set Your User Name And Bio'}
-                </h2>
-              )}
-              
-              {isEditing ? (
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  className="w-full px-4 py-2 rounded-xl bg-white/50 dark:bg-gray-900/50 
-                    border border-gray-200/20 dark:border-gray-700/20 
-                    focus:outline-none focus:ring-2 focus:ring-violet-500 
-                    text-gray-900 dark:text-white transition-all duration-300"
-                  placeholder="Add a bio..."
-                  rows="3"
-                />
-              ) : (
-                <p className="text-gray-600 dark:text-gray-400">{bio || 'No bio yet'}</p>
+      {/* Tabs for Uploaded and Liked Memes */}
+      <div className="mt-8">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+          <button
+            onClick={() => setActiveTab('uploaded')}
+            className={`py-3 px-6 font-medium text-sm focus:outline-none ${
+              activeTab === 'uploaded'
+                ? 'border-b-2 border-indigo-500 text-indigo-500'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <HiUpload className="w-5 h-5" />
+              <span>Uploaded Memes</span>
+              {uploadedMemes.length > 0 && (
+                <span className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {uploadedMemes.length}
+                </span>
               )}
             </div>
-          </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('liked')}
+            className={`py-3 px-6 font-medium text-sm focus:outline-none ${
+              activeTab === 'liked'
+                ? 'border-b-2 border-indigo-500 text-indigo-500'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <HiOutlineHeart className="w-5 h-5" />
+              <span>Liked Memes</span>
+              {likedMemes.length > 0 && (
+                <span className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {likedMemes.length}
+                </span>
+              )}
+            </div>
+          </button>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-4 mt-6">
-            <button
-              onClick={handleUpload}
-              disabled={isLoading || !file}
-              className={`px-6 py-2 rounded-xl transition-all duration-300
-                ${isLoading || !file 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-violet-600 to-pink-600 hover:from-pink-600 hover:to-violet-600'
-                } text-white shadow-lg hover:shadow-xl`}
-            >
-              {isLoading ? 'Uploading...' : 'Update Picture'}
-            </button>
+        {/* Uploaded Memes Section */}
+        {activeTab === 'uploaded' && (
+          <AnimatePresence>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {uploadedMemes.map((meme) => (
+                <motion.div
+                  key={meme.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden border border-white/20 dark:border-gray-700/20"
+                >
+                  <div 
+                    className="relative cursor-pointer" 
+                    onClick={() => navigate(`/meme/${meme.id}`)}
+                  >
+                    <img
+                      src={meme.imageUrl}
+                      alt={meme.caption || 'Meme'}
+                      className="w-full aspect-square object-cover"
+                    />
+                    {meme.caption && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 p-2">
+                        <p className="text-white text-sm truncate">{meme.caption}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-indigo-500">
+                        <HiUpload className="w-5 h-5 mr-1" />
+                        <span className="text-sm">Uploaded</span>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {meme.createdAt ? new Date(meme.createdAt).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
             
-            <button
-              onClick={() => {
-                if (isEditing) {
-                  updateProfileDetails();
-                }
-                setIsEditing(!isEditing);
-              }}
-              className="px-6 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 
-                text-white shadow-lg hover:shadow-xl transition-all duration-300
-                hover:from-pink-600 hover:to-violet-600 flex items-center space-x-2"
-            >
-              {isEditing ? <HiSave className="w-5 h-5" /> : <HiOutlinePencil className="w-5 h-5" />}
-              <span>{isEditing ? 'Save Changes' : 'Edit Profile'}</span>
-            </button>
-          </div>
-        </div>
+            {uploadedMemes.length === 0 && (
+              <div className="text-center py-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl border border-white/20 dark:border-gray-700/20">
+                <HiUpload className="w-16 h-16 mx-auto text-gray-400" />
+                <p className="mt-4 text-gray-600 dark:text-gray-400">You haven't uploaded any memes yet</p>
+                <button
+                  onClick={() => navigate('/upload')}
+                  className="mt-4 px-6 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                >
+                  Create a Meme
+                </button>
+              </div>
+            )}
+          </AnimatePresence>
+        )}
 
         {/* Liked Memes Section */}
-        <div className="mt-8">
-          <LikedMemes />
-        </div>
+        {activeTab === 'liked' && (
+          <AnimatePresence>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {likedMemes.map((meme) => (
+                <motion.div
+                  key={meme.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg rounded-2xl shadow-lg overflow-hidden border border-white/20 dark:border-gray-700/20 relative group"
+                >
+                  <div 
+                    className="relative cursor-pointer" 
+                    onClick={() => navigate(`/meme/${meme.id}`)}
+                  >
+                    <img
+                      src={meme.url}
+                      alt={meme.caption || meme.name || 'Meme'}
+                      className="w-full aspect-square object-cover"
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/400?text=Image+Not+Available';
+                      }}
+                    />
+                    {(meme.caption || meme.name) && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 p-2">
+                        <p className="text-white text-sm truncate">{meme.caption || meme.name}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-red-500">
+                        <HiHeart className="w-5 h-5 mr-1" />
+                        <span className="text-sm">Liked</span>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {meme.createdAt ? new Date(meme.createdAt).toLocaleDateString() : 
+                         meme.timestamp ? new Date(meme.timestamp).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Unlike button overlay */}
+                  <button
+                    onClick={() => handleUnlike(meme)}
+                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+                    title="Unlike this meme"
+                  >
+                    <HiTrash className="w-5 h-5" />
+                  </button>
+
+                  {/* Download button overlay */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownload(meme);
+                    }}
+                    className="absolute top-2 left-2 p-2 bg-blue-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-blue-600"
+                    title="Download this meme"
+                  >
+                    <FaDownload className="w-5 h-5" />
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+            
+            {likedMemes.length === 0 && (
+              <div className="text-center py-12 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md rounded-2xl border border-white/20 dark:border-gray-700/20">
+                <HiOutlineHeart className="w-16 h-16 mx-auto text-gray-400" />
+                <p className="mt-4 text-gray-600 dark:text-gray-400">No liked memes yet</p>
+                <button
+                  onClick={() => navigate('/explorer')}
+                  className="mt-4 px-6 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                >
+                  Explore Memes
+                </button>
+              </div>
+            )}
+          </AnimatePresence>
+        )}
       </div>
     </div>
   );

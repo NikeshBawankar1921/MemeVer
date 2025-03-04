@@ -3,7 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { showSuccessToast, showErrorToast } from '../../utils/toast';
 import { HiMail, HiLockClosed, HiUser } from 'react-icons/hi';
 
 const Register = () => {
@@ -59,13 +59,17 @@ const Register = () => {
         name: formData.name,
         email: formData.email,
         contact: formData.contact,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        likedMemes: [],
+        uploadedMemes: [],
+        bio: ''
       });
 
-      toast.success('Registration successful!');
-      navigate('/profile');
+      showSuccessToast('Registration successful!');
+      navigate('/');
     } catch (error) {
-      toast.error(error.message);
+      console.error('Registration error:', error);
+      showErrorToast(error.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }

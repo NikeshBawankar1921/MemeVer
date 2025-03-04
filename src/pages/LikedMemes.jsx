@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { HiDownload, HiShare } from 'react-icons/hi';
+import { HiDownload, HiShare, HiHeart } from 'react-icons/hi';
 import { toast } from 'react-hot-toast';
 import { handleShare } from '../utils/shareUtils';
 import { getLikedMemes } from '../utils/likeUtils';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
+import { doc, updateDoc, arrayRemove, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 const LikedMemes = () => {
@@ -31,8 +32,44 @@ const LikedMemes = () => {
       fetchLikedMemes();
     } else {
       setLoading(false);
+      navigate('/auth/login');
+      toast.error('Please login to view your liked memes');
     }
-  }, []);
+  }, [navigate]);
+
+  const handleUnlike = async (meme) => {
+    if (!auth.currentUser) {
+      toast.error('Please login to manage your liked memes');
+      navigate('/auth/login');
+      return;
+    }
+    
+    try {
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const likedMemes = userData.likedMemes || [];
+        const existingMeme = likedMemes.find(m => m.id === meme.id);
+        
+        if (existingMeme) {
+          // Remove from liked memes
+          await updateDoc(userRef, {
+            likedMemes: arrayRemove(existingMeme)
+          });
+          
+          // Update local state
+          setLikedMemes(prevMemes => prevMemes.filter(m => m.id !== meme.id));
+          
+          toast.success('Removed from your liked memes');
+        }
+      }
+    } catch (error) {
+      console.error('Error unliking meme:', error);
+      toast.error('Failed to unlike meme');
+    }
+  };
 
   const handleDownload = async (meme) => {
     try {
@@ -95,23 +132,33 @@ const LikedMemes = () => {
               <h3 className="font-medium mb-2 text-gray-900 dark:text-white truncate">
                 {meme.name}
               </h3>
-              <div className="flex justify-end space-x-3">
+              <div className="flex justify-between items-center">
                 <button
-                  onClick={() => handleDownload(meme)}
-                  className="text-xl text-violet-500 hover:text-violet-600 transition-colors"
+                  onClick={() => handleUnlike(meme)}
+                  className="flex items-center gap-1 text-red-500 hover:text-red-600 transition-colors"
+                  title="Unlike this meme"
                 >
-                  <HiDownload />
+                  <HiHeart className="w-5 h-5" />
+                  <span className="text-sm">Unlike</span>
                 </button>
-                <button
-                  onClick={() => handleShare({
-                    name: meme.name,
-                    url: meme.url,
-                    type: 'meme'
-                  })}
-                  className="text-xl text-pink-500 hover:text-pink-600 transition-colors"
-                >
-                  <HiShare />
-                </button>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => handleDownload(meme)}
+                    className="text-xl text-violet-500 hover:text-violet-600 transition-colors"
+                  >
+                    <HiDownload />
+                  </button>
+                  <button
+                    onClick={() => handleShare({
+                      name: meme.name,
+                      url: meme.url,
+                      type: 'meme'
+                    })}
+                    className="text-xl text-pink-500 hover:text-pink-600 transition-colors"
+                  >
+                    <HiShare />
+                  </button>
+                </div>
               </div>
             </div>
           </div>

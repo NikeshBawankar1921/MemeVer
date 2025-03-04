@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from '../../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { HiMail, HiLockClosed } from 'react-icons/hi';
-import toast from 'react-hot-toast';
+import { showSuccessToast, showErrorToast } from '../../utils/toast';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -25,23 +25,12 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      // Save user data in localStorage
-      localStorage.setItem('user', JSON.stringify({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL
-      }));
-      localStorage.setItem('userCredentials', JSON.stringify({
-        email: email,
-        password: password
-      }));
-      toast.success('Successfully logged in!');
-      navigate('/profile');
+      await signInWithEmailAndPassword(auth, email, password);
+      showSuccessToast('Logged in successfully!');
+      navigate('/');
     } catch (error) {
-      toast.error(error.message);
+      console.error('Login error:', error);
+      showErrorToast(error.message || 'Failed to login');
     } finally {
       setLoading(false);
     }
