@@ -37,24 +37,7 @@ function App() {
 
   return (
     <Router>
-      <Toaster
-        position="top-center"
-        reverseOrder={false}
-        gutter={8}
-        containerStyle={{
-          top: 60, // Adjusted to appear below the top navigation bar
-        }}
-        toastOptions={{
-          className: '',
-          style: {
-            padding: '12px 24px',
-            borderRadius: '8px',
-            fontSize: '14px',
-            maxWidth: '500px',
-            wordBreak: 'break-word'
-          }
-        }}
-      />
+      
       <div className="flex flex-col min-h-screen bg-blue-500  dark:bg-gray-900">
         {/* Top Navigation */}
         <nav className="fixed top-0 left-0 right-0 bg-gradient-to-r from-violet-600/90 via-fuchsia-500/90 to-red-500/90 shadow-lg backdrop-blur-md dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 z-50">

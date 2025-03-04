@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { IMGBB_API_KEY } from '../config/constants';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { FaHeart, FaDownload } from 'react-icons/fa';
-import { saveAs } from 'file-saver';
 import { toast } from 'react-hot-toast';
 
 const Profile = () => {
@@ -80,7 +79,7 @@ const Profile = () => {
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
-          toast.error('Failed to load profile data');
+          toast.error('Failed to load profile data', { position: 'top-center' });
         } finally {
           setIsLoading(false);
         }
@@ -109,11 +108,11 @@ const Profile = () => {
         bio
       });
       
-      toast.success('Profile updated successfully');
+      toast.success('Profile updated successfully', { position: 'top-center' });
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
+      toast.error('Failed to update profile', { position: 'top-center' });
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +125,7 @@ const Profile = () => {
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
+      toast.error('Image must be less than 5MB', { position: 'top-center' });
       return;
     }
     
@@ -160,13 +159,13 @@ const Profile = () => {
         });
         
         setProfilePicture(imageUrl);
-        toast.success('Profile picture updated successfully');
+        toast.success('Profile picture updated successfully', { position: 'top-center' });
       } else {
         throw new Error('Failed to upload image to ImgBB');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload profile picture');
+      toast.error('Failed to upload profile picture', { position: 'top-center' });
     } finally {
       setIsLoading(false);
     }
@@ -176,25 +175,25 @@ const Profile = () => {
     try {
       await auth.signOut();
       navigate('/auth/login');
-      toast.success('Logged out successfully');
+      toast.success('Logged out successfully', { position: 'top-center' });
     } catch (error) {
       console.error('Error logging out:', error);
-      toast.error('Failed to log out');
+      toast.error('Failed to log out', { position: 'top-center' });
     }
   };
 
   const handleUnlike = async (meme) => {
-    if (!user) {
-      toast.error('Please login to manage liked memes');
-      return;
-    }
-
     try {
+      if (!user) {
+        toast.error('You must be logged in to unlike memes', { position: 'top-center' });
+        return;
+      }
+
       const userRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        toast.error('User document not found');
+        toast.error('User document not found', { position: 'top-center' });
         return;
       }
 
@@ -208,10 +207,10 @@ const Profile = () => {
 
       // Update local state
       setLikedMemes((prevMemes) => prevMemes.filter((m) => m.id !== meme.id));
-      toast.success('Removed from liked memes');
+      toast.success('Removed from liked memes', { position: 'top-center' });
     } catch (error) {
-      console.error('Error removing like:', error);
-      toast.error('Failed to remove from liked memes');
+      console.error('Error unliking meme:', error);
+      toast.error('Failed to unlike meme', { position: 'top-center' });
     }
   };
 
@@ -229,10 +228,10 @@ const Profile = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast.success('Meme downloaded successfully');
+      toast.success('Meme downloaded successfully', { position: 'top-center' });
     } catch (error) {
-      console.error('Download error:', error);
-      toast.error('Failed to download meme');
+      console.error('Error downloading meme:', error);
+      toast.error('Failed to download meme', { position: 'top-center' });
     }
   };
 
